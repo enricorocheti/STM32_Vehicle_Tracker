@@ -75,9 +75,6 @@ void Error_Handler(void);
 #define LD_SIM_GPIO_Port GPIOC
 #define LD_GPS_Pin GPIO_PIN_11
 #define LD_GPS_GPIO_Port GPIOC
-#define IGN_SIGNAL_Pin GPIO_PIN_12
-#define IGN_SIGNAL_GPIO_Port GPIOC
-#define IGN_SIGNAL_EXTI_IRQn EXTI15_10_IRQn
 #define T_SWO_Pin GPIO_PIN_3
 #define T_SWO_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
