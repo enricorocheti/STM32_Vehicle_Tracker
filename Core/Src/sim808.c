@@ -51,12 +51,13 @@ int SendCommandSimRadio( char *command, char *response )
 
 int InitSimRadio( void )
 {
-	char cmd_resp[25] = "\0";
+	char cmd_resp[25];
 	int ret;
 
 	/*** SIM initialization ***/
+	memset(cmd_resp, 0, 25);
 	ret = SendCommandSimRadio( AT_SIM_SET_ECHOOFF, cmd_resp );
-	if ( strcmp(cmd_resp, "ATE\r\r\nOK\r\n") || ret != 1 )
+	if ( strcmp(cmd_resp, "ATE0\r\r\nOK\r\n") || ret != 1 )
 	{
 		return -1;
 	}

@@ -139,7 +139,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-  PowerOnSimRadio();
+
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of MutexSerialComSIM808 */
@@ -225,6 +225,7 @@ void StartDefaultTask(void *argument)
 void FuncLowPwrMode(void *argument)
 {
   /* USER CODE BEGIN FuncLowPwrMode */
+	PowerOnSimRadio();
   /* Infinite loop */
   for(;;)
   {
@@ -234,7 +235,9 @@ void FuncLowPwrMode(void *argument)
 		if ( flags == 0x01 )
 		{
 			/* Turn off low-power mode */
+			osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
 			InitSimRadio();
+			osMutexRelease( MutexSerialComSIM808Handle );
 			InitImu();
 
 			uiGVLowPowerFlag = 0x01;
@@ -247,7 +250,9 @@ void FuncLowPwrMode(void *argument)
 		else if ( flags == 0x02 )
 		{
 			/* Turn on low-power mode */
+			osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
 			LowPowerModeSimRadio();
+			osMutexRelease( MutexSerialComSIM808Handle );
 			LowPowerModeImu();
 
 			uiGVLowPowerFlag = 0x02;
@@ -330,7 +335,9 @@ void FuncSensorData(void *argument)
 			  /* 10 seconds timer has been triggered */
 			  memset( &xGVDataPacket, 0, sizeof(xGVDataPacket) );
 
+			  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
 			  GetGpsData( &xGVDataPacket );
+			  osMutexRelease( MutexSerialComSIM808Handle );
 			  if ( xGVDataPacket.gpsStatus == 'A' )
 			  {
 				  /* GPS data is not valid */
