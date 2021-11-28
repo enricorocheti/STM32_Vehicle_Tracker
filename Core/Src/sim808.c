@@ -1,4 +1,5 @@
 #include "sim808.h"
+#include "main.h"
 
 
 int SendCommandSimRadio( char *command, char *response )
@@ -182,4 +183,12 @@ int LowPowerModeSimRadio( void )
 	}
 
 	return 1;
+}
+
+void PowerOnSimRadio( void )
+{
+	/* Set SIM808 EVB-V3.2 D9 pin high for one second to turn on the radio */
+	HAL_GPIO_WritePin( POWER_SIM_GPIO_Port, POWER_SIM_Pin, GPIO_PIN_SET);
+	osDelay(1000);
+	HAL_GPIO_WritePin( POWER_SIM_GPIO_Port, POWER_SIM_Pin, GPIO_PIN_RESET);
 }

@@ -139,7 +139,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+  PowerOnSimRadio();
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of MutexSerialComSIM808 */
@@ -266,7 +266,9 @@ void FuncLowPwrMode(void *argument)
 	    osDelay(1000);
 	}
   }
+  /* USER CODE END FuncLowPwrMode */
 }
+
 
 /* USER CODE BEGIN Header_FuncNwConnect */
 /**
