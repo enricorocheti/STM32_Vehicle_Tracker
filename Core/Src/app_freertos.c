@@ -233,12 +233,10 @@ void FuncLowPwrMode(void *argument)
 	{
 		if ( flags == 0x01 )
 		{
-
-			InitSimRadio(); // = int ? capturar erro
+			/* Turn off low-power mode */
+			InitSimRadio();
 			InitImu();
 
-
-			/* Turn off low-power mode */
 			uiGVLowPowerFlag = 0x01;
 
 			/* Turn off system LEDs */
@@ -249,8 +247,10 @@ void FuncLowPwrMode(void *argument)
 		else if ( flags == 0x02 )
 		{
 			/* Turn on low-power mode */
-			uiGVLowPowerFlag = 0x02;
+			LowPowerModeSimRadio();
 			LowPowerModeImu();
+
+			uiGVLowPowerFlag = 0x02;
 		}
 		flags = osThreadFlagsClear( flags );
 	}
@@ -259,7 +259,6 @@ void FuncLowPwrMode(void *argument)
 		/* Should not change system operation mode */
 		if ( uiGVLowPowerFlag == 0x02 )
 		{
-			//printf("Teste\n");
 			/* Blink LEDs to show that the system is on low-power mode */
 			HAL_GPIO_TogglePin(LD_GPS_GPIO_Port, LD_GPS_Pin);
 			HAL_GPIO_TogglePin(LD_SIM_GPIO_Port, LD_SIM_Pin);

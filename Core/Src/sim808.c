@@ -162,3 +162,24 @@ int GetGpsData( struct sensorData *data )
 
 	return ret;
 }
+
+
+int LowPowerModeSimRadio( void )
+{
+	char response[25] = "\0";
+
+	SendCommandSimRadio( AT_SIM_SET_MINFUNC, response );
+	if ( strcmp(response, "\r\nOK\r\n") )
+	{
+		return -1;
+	}
+
+	memset(response, 0, 25);
+	SendCommandSimRadio( AT_GPS_SET_PWROFF, response );
+	if ( strcmp(response, "\r\nOK\r\n") )
+	{
+		return -1;
+	}
+
+	return 1;
+}

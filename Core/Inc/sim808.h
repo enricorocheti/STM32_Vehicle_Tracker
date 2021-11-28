@@ -13,7 +13,8 @@ extern "C" {
 
 
 // General commands
-#define AT_SIM_SET_FULLFUNC		"AT+CFUN=1\r\n"		// Set Phone Full functionality
+#define AT_SIM_SET_FULLFUNC		"AT+CFUN=1\r\n"		// Set Phone to Full functionality
+#define AT_SIM_SET_MINFUNC		"AT+CFUN=0\r\n"		// Set Phone to Minimum functionality
 #define AT_SIM_GET_CPIN			"AT+CPIN?\r\n"		// Check if SIM card is inserted
 #define AT_SIM_SET_ECHOOFF		"ATE0\r\n"			// Disable commands echo
 
@@ -44,6 +45,8 @@ int InitSimRadio( void );
 int JoinNetworkSimRadio( void );
 
 int GetGpsData( struct sensorData *data );
+
+int LowPowerModeSimRadio( void );
 
 
 #endif
