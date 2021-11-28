@@ -56,13 +56,6 @@ int InitSimRadio( void )
 
 	/*** SIM initialization ***/
 	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_SIM_SET_ECHOOFF, cmd_resp );
-	if ( strcmp(cmd_resp, "ATE0\r\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	memset(cmd_resp, 0, 25);
 	ret = SendCommandSimRadio( AT_SIM_SET_FULLFUNC, cmd_resp );
 	if ( strcmp(cmd_resp, "\r\nOK\r\n") || ret != 1 )
 	{
@@ -186,10 +179,24 @@ int LowPowerModeSimRadio( void )
 	return 1;
 }
 
-void PowerOnSimRadio( void )
+int PowerOnSimRadio( void )
 {
+	char cmd_resp[25];
+	int ret;
+
 	/* Set SIM808 EVB-V3.2 D9 pin high for one second to turn on the radio */
 	HAL_GPIO_WritePin( POWER_SIM_GPIO_Port, POWER_SIM_Pin, GPIO_PIN_SET);
 	osDelay(1000);
 	HAL_GPIO_WritePin( POWER_SIM_GPIO_Port, POWER_SIM_Pin, GPIO_PIN_RESET);
+	osDelay(100);
+
+	/* Disable command echo */
+	memset(cmd_resp, 0, 25);
+	ret = SendCommandSimRadio( AT_SIM_SET_ECHOOFF, cmd_resp );
+	if ( strcmp(cmd_resp, "ATE0\r\r\nOK\r\n") || ret != 1 )
+	{
+		return -1;
+	}
+
+	return 1;
 }

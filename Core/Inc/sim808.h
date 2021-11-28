@@ -48,6 +48,6 @@ int GetGpsData( struct sensorData *data );
 
 int LowPowerModeSimRadio( void );
 
-void PowerOnSimRadio( void );
+int PowerOnSimRadio( void );
 
 #endif
