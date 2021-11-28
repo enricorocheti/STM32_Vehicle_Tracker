@@ -28,9 +28,13 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+
 #include "usart.h"
 #include "i2c.h"
+
 #include "global.h"
+#include "sim808.h"
+#include "mpu6050.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,41 +45,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-// I2C regs
-
-
-// General commands
-#define AT_SIM_SET_FULLFUNC		"AT+CFUN=1\r\n"		// Set Phone Full functionality
-#define AT_SIM_GET_CPIN			"AT+CPIN?\r\n"		// Check if SIM card is inserted
-#define AT_SIM_SET_ECHOOFF		"ATE0\r\n"			// Disable commands echo
-
-// GPS commands
-#define AT_GPS_SET_PWRON		"AT+CGPSPWR=1\r\n"	// Power On GPS
-#define AT_GPS_SET_PWROFF		"AT+CGPSPWR=0\r\n"	// Power Off GPS
-#define AT_GPS_SET_HOTMODE		"AT+CGPSRST=1\r\n"	// Set GPS to hot start
-#define AT_GPS_GET_DATA			"AT+CGPSINF=32\r\n"	// Get GPS data in NMEA format
-
-// Network commands
-#define AT_NW_SET_GPRS			"AT+CGATT=1\r\n"	// Attach from GPRS Service
-#define AT_NW_SET_TCPMODE		"AT+CIPMODE=0\r\n"	// Select TCPIP Application Mode
-#define AT_NW_SET_SINGLEIP		"AT+CIPMUX=0\r\n"	// Set Single IP connection
-#define AT_NW_SET_CONNECTION	"AT+CIICR\r\n"		// Bring up wireless connection with GPRS
-#define AT_NW_GET_LOCALIP		"AT+CIFSR\r\n"		// Get Local IP Address
-#define AT_NW_GET_RSSI			"AT+CSQ\r\n"		// Get signal strength in dBm
-
-// Network APNs
-#define AT_NW_SET_APNVIVO		"AT+CSTT=\"zap.vivo.com.br\",\"vivo\",\"vivo\"\r\n"
-#define AT_NW_SET_APNTIM		"AT+CSTT=\"timbrasil.br\",\"tim\",\"tim\"\r\n"
-#define AT_NW_SET_APNCLARO		"AT+CSTT=\"claro.com.br\",\"claro\",\"claro\"\r\n"
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-int SendCommandSimRadio( char *command, char *response );
-int InitSimRadio( void );
-int JoinSimRadioNetwork( void );
-void GetGpsData( struct sensorData *data );
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -83,7 +57,7 @@ void GetGpsData( struct sensorData *data );
 
 // 1 = MODO LP OFF
 // 2 = MODO LP ON
-uint8_t uiGVLowPowerFlag = 0x01;
+uint8_t uiGVLowPowerFlag = 0x02;
 uint8_t uiGVNetworkStatus = 0;
 struct sensorData xGVDataPacket;
 
@@ -312,7 +286,7 @@ void FuncNwConnect(void *argument)
 	  {
 		  if ( uiGVNetworkStatus == 0 )
 		  {
-			  int ret = JoinSimRadioNetwork();
+			  int ret = 1;//JoinSimRadioNetwork();
 			  if ( ret == 1 )
 			  {
 				  /* Successfully joined network */
@@ -353,7 +327,6 @@ void FuncSensorData(void *argument)
 		  if ( flags == 0x00000001 )
 		  {
 			  /* 10 seconds timer has been triggered */
-			  ///// TO DO, DEFINIR TAMANHO EM BYTES DA STRUCT SENSORDATA
 			  memset( &xGVDataPacket, 0, sizeof(xGVDataPacket) );
 
 			  GetGpsData( &xGVDataPacket );
@@ -438,176 +411,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			osThreadFlagsSet( TaskLowPwrModeHandle, 0x00000001 );
 		}
 	}
-}
-
-/*
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	uint32_t teste2;
-	if (htim == &htim16)
-	{
-		teste2 = osThreadFlagsSet( TaskSensorDataHandle, 0x00000001 );
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-	}
-}*/
-
-
-int SendCommandSimRadio( char *command, char *response )
-{
-	uint16_t temp_byte;
-	uint16_t prev_byte;
-	uint32_t timeout = 400000; // Approx. 10 seconds timeout
-	uint8_t i = 0;
-	uint8_t amble = 0;
-
-	HAL_UART_Transmit( &huart1, (uint8_t *)command, strlen(command), 1000 );
-
-	while ( 1 && (--timeout > 0) )
-	{
-		// Read byte from UART
-		if ( HAL_UART_Receive( &huart1, &temp_byte, 1, 0 ) == HAL_OK )
-		{
-			response[i] = temp_byte;
-			i++;
-		}
-
-		// Check for preamble or postamble
-		if (prev_byte == '\r' && temp_byte == '\n')
-		{
-			if (amble == 0)
-			{
-				// Preamble \r\n (0x0D 0x0A)
-				amble = 1;
-			}
-			else if (amble == 1)
-			{
-				// Postamble \r\n (0x0D 0x0A)
-				break;
-			}
-		}
-		prev_byte = temp_byte;
-	}
-
-	if ( !strcmp(response, "\r\nERROR\r\n") || timeout == 0 )
-	{
-		return -1;
-	}
-	else
-	{
-		return 1;
-	}
-}
-
-int InitSimRadio( void )
-{
-	char cmd_resp[25] = "\0";
-	int ret;
-
-	/*** SIM initialization ***/
-	ret = SendCommandSimRadio( AT_SIM_SET_ECHOOFF, cmd_resp );
-	if ( strcmp(cmd_resp, "ATE\r\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_SIM_SET_FULLFUNC, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_SIM_GET_CPIN, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\n+CPIN: READY\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	/*** Network initialization ***/
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_NW_SET_GPRS, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_NW_SET_TCPMODE, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_NW_SET_SINGLEIP, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	/*** GPS initialization ***/
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_GPS_SET_PWRON, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_GPS_SET_HOTMODE, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
-
-	return 1;
-}
-
-int JoinSimRadioNetwork( void )
-{
-	char response[25] = "\0";
-
-	SendCommandSimRadio( AT_NW_SET_APNCLARO, response );
-	if ( strcmp(response, "\r\nOK\r\n") )
-	{
-		return -1;
-	}
-
-	memset(response, 0, 25);
-	SendCommandSimRadio( AT_NW_SET_CONNECTION, response );
-	if ( strcmp(response, "\r\nOK\r\n") )
-	{
-		return -1;
-	}
-
-	return 1;
-}
-
-
-void GetGpsData( struct sensorData *data )
-{
-	char response[128] = "\0";
-	char comma[2] = ",";
-
-	int ret;
-	ret = SendCommandSimRadio( AT_GPS_GET_DATA, response );
-	char *ptr = strtok(response[14], comma);
-
-	data->utcTime = *ptr;
-	ptr = strtok(NULL, comma);
-	data->gpsStatus = *ptr; 		// possui byte 0 no final, talvez seja preciso remover
-	ptr = strtok(NULL, comma);
-	data->latitude = *ptr;
-	ptr = strtok(NULL, comma);
-	data->nsIndicator = *ptr;
-	ptr = strtok(NULL, comma);
-	data->longitude = *ptr;
-	ptr = strtok(NULL, comma);
-	data->ewIndicator = *ptr;
-	ptr = strtok(NULL, comma);
-	data->speedKnots = *ptr;
-	ptr = strtok(NULL, comma);
 }
 
 /* USER CODE END Application */
