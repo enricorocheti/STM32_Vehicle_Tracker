@@ -2,7 +2,7 @@
 FREERTOS.FootprintOK=true
 FREERTOS.IPParameters=Tasks01,configUSE_NEWLIB_REENTRANT,FootprintOK,configENABLE_FPU,configTOTAL_HEAP_SIZE,Mutexes01,Timers01
 FREERTOS.Mutexes01=MutexSerialComSIM808,Dynamic,NULL;MutexDataPacket,Dynamic,NULL;MutexNetworkStatus,Dynamic,NULL
-FREERTOS.Tasks01=defaultTask,24,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;TaskLowPwrMode,40,1024,FuncLowPwrMode,Default,NULL,Dynamic,NULL,NULL;TaskNwConnect,26,1024,FuncNwConnect,Default,NULL,Dynamic,NULL,NULL;TaskSensorData,24,1024,FuncSensorData,Default,NULL,Dynamic,NULL,NULL;TaskNwSendData,24,1024,FuncNwSendData,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.Tasks01=defaultTask,24,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;TaskLowPwrMode,40,12000,FuncLowPwrMode,Default,NULL,Dynamic,NULL,NULL;TaskNwConnect,26,1024,FuncNwConnect,Default,NULL,Dynamic,NULL,NULL;TaskSensorData,24,1024,FuncSensorData,Default,NULL,Dynamic,NULL,NULL;TaskNwSendData,24,1024,FuncNwSendData,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.Timers01=SensorDataTimer,CallbackTimer,osTimerPeriodic,Default,NULL,Dynamic,NULL
 FREERTOS.configENABLE_FPU=1
 FREERTOS.configTOTAL_HEAP_SIZE=65536
