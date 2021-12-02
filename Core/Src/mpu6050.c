@@ -1,5 +1,7 @@
 #include "mpu6050.h"
 
+#define ARM_MATH_CM4
+#include <arm_math.h>
 
 int InitImu( void )
 {
@@ -70,6 +72,17 @@ void GetImuData( struct sensorData * data )
 	data->gyroX = rawGyroX / 16384.0;
 	data->gyroY = rawGyroY / 16384.0;
 	data->gyroZ = rawGyroZ / 16384.0;
+}
+
+
+void FilterImuData( void )
+{
+	//Float IIR Filter
+	float irrStateF32[8];
+	float iirCoeffF32[10] = { 0.077f, 0.154f, 0.077f, 1.049f, -0.296f,
+							  0.063f, 0.125f, 0.063f, 1.321f, -0.633f };
+	arm_biquad_casd_df1_inst_f32 armIIRInstanceF32;
+	arm_biquad_cascade_df1_init_f32(&armIIRInstanceF32, 2, iirCoeffF32, irrStateF32);
 }
 
 

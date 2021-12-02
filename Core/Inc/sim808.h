@@ -18,6 +18,8 @@ extern "C" {
 #define AT_SIM_GET_CPIN			"AT+CPIN?\r\n"		// Check if SIM card is inserted
 #define AT_SIM_SET_ECHOOFF		"ATE0\r\n"			// Disable commands echo
 
+#define AT_TEST 				"AT+CFUN?\r\n"
+
 // GPS commands
 #define AT_GPS_SET_PWRON		"AT+CGPSPWR=1\r\n"	// Power On GPS
 #define AT_GPS_SET_PWROFF		"AT+CGPSPWR=0\r\n"	// Power Off GPS
@@ -49,5 +51,7 @@ int GetGpsData( struct sensorData *data );
 int LowPowerModeSimRadio( void );
 
 int PowerOnSimRadio( void );
+
+int SendCommandSimRadio_NEW( char *command, char *response, uint16_t size_cmd, uint16_t size_rsp );
 
 #endif

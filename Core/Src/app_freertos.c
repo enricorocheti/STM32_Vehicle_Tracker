@@ -74,7 +74,7 @@ osThreadId_t TaskLowPwrModeHandle;
 const osThreadAttr_t TaskLowPwrMode_attributes = {
   .name = "TaskLowPwrMode",
   .priority = (osPriority_t) osPriorityHigh,
-  .stack_size = 1024 * 4
+  .stack_size = 12000 * 4
 };
 /* Definitions for TaskNwConnect */
 osThreadId_t TaskNwConnectHandle;
@@ -236,7 +236,7 @@ void FuncLowPwrMode(void *argument)
 		{
 			/* Turn off low-power mode */
 			osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
-			InitSimRadio();
+			int ret = InitSimRadio();
 			osMutexRelease( MutexSerialComSIM808Handle );
 			InitImu();
 
@@ -270,10 +270,10 @@ void FuncLowPwrMode(void *argument)
 		}
 	    osDelay(1000);
 	}
+	osDelay(10);
   }
   /* USER CODE END FuncLowPwrMode */
 }
-
 
 /* USER CODE BEGIN Header_FuncNwConnect */
 /**
@@ -307,7 +307,7 @@ void FuncNwConnect(void *argument)
 		  }
 		  osDelay(10000);
 	  }
-	  osDelay(1);
+	  osDelay(10);
   }
   /* USER CODE END FuncNwConnect */
 }
@@ -333,6 +333,9 @@ void FuncSensorData(void *argument)
 		  if ( flags == 0x00000001 )
 		  {
 			  /* 10 seconds timer has been triggered */
+
+			  /* Changing xGVDataPacket variable */
+			  osMutexAcquire( MutexDataPacketHandle, osWaitForever );
 			  memset( &xGVDataPacket, 0, sizeof(xGVDataPacket) );
 
 			  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
@@ -351,13 +354,16 @@ void FuncSensorData(void *argument)
 
 			  GetImuData( &xGVDataPacket );
 
+			  /* Done with the xGVDataPacket variable */
+			  osMutexRelease( MutexDataPacketHandle );
+
 			  /* Tells TaskNwSendData that there is new data to be sent */
 			  osThreadFlagsSet( TaskNwSendDataHandle, 0x00000001 );
 
 			  flags = osThreadFlagsClear( flags );
 		  }
 	  }
-	  osDelay(1);
+	  osDelay(10);
   }
   /* USER CODE END FuncSensorData */
 }
@@ -377,9 +383,16 @@ void FuncNwSendData(void *argument)
   {
 	  if ( uiGVLowPowerFlag == 0x01 )
 	  {
+		  uint32_t flags = osThreadFlagsGet();
+		  if ( flags == 0x00000001 )
+		  {
+			  //osMutexAcquire( MutexDataPacketHandle, osWaitForever );
+			  //osMutexRelease( MutexDataPacketHandle );
+			  //flags = osThreadFlagsClear( flags );
+		  }
 
 	  }
-	  osDelay(100);
+	  osDelay(10);
   }
   /* USER CODE END FuncNwSendData */
 }

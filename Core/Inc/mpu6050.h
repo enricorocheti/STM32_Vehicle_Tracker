@@ -30,5 +30,6 @@ void GetImuData( struct sensorData * data );
 
 void LowPowerModeImu( void );
 
+void FilterImuData( void );
 
 #endif
