@@ -1,7 +1,5 @@
 #include "mpu6050.h"
 
-#define ARM_MATH_CM4
-#include <arm_math.h>
 
 int InitImu( void )
 {
@@ -48,8 +46,22 @@ void GetImuData( struct sensorData * data )
 	int16_t rawAccelX = 0, rawAccelY = 0, rawAccelZ = 0;
 	int16_t rawGyroX = 0, rawGyroY = 0, rawGyroZ = 0;
 
-	// Read 6 BYTES of data starting from ACCEL_XOUT_H register
-	HAL_I2C_Mem_Read( &hi2c1, MPU6050_ADDR, REG_ACCEL_XOUT_H, 1, accelData, 6, 500 );
+	float accelX[100];
+	float accelY[100];
+	float accelZ[100];
+
+	for ( uint8_t i = 0; i < 100; i++ )
+	{
+		// Read 6 BYTES of data starting from ACCEL_XOUT_H register
+		HAL_I2C_Mem_Read( &hi2c1, MPU6050_ADDR, REG_ACCEL_XOUT_H, 1, accelData, 6, 500 );
+		rawAccelX = (int16_t) ( accelData[0] << 8 | accelData[1] );
+		rawAccelY = (int16_t) ( accelData[2] << 8 | accelData[3] );
+		rawAccelZ = (int16_t) ( accelData[4] << 8 | accelData[5] );
+
+		accelX[i] = rawAccelX * GRAVITY_ACC / 16384.0;
+		accelY[i] = rawAccelY * GRAVITY_ACC / 16384.0;
+		accelZ[i] = rawAccelZ * GRAVITY_ACC / 16384.0;
+	}
 
 	// Read 6 BYTES of data starting from GYRO_XOUT_H register
 	HAL_I2C_Mem_Read( &hi2c1, MPU6050_ADDR, REG_GYRO_XOUT_H, 1, gyroData, 6, 500 );
@@ -59,30 +71,42 @@ void GetImuData( struct sensorData * data )
 	     I have configured FS_SEL = 0. So I am dividing by 16384.0
 	     for more details check ACCEL_CONFIG Register              ****/
 
-	rawAccelX = (int16_t) ( accelData[0] << 8 | accelData[1] );
-	rawAccelY = (int16_t) ( accelData[2] << 8 | accelData[3] );
-	rawAccelZ = (int16_t) ( accelData[4] << 8 | accelData[5] );
-	data->accelX = rawAccelX / 16384.0;
-	data->accelY = rawAccelY / 16384.0;
-	data->accelZ = rawAccelZ / 16384.0;
-
 	rawGyroX = (int16_t) ( gyroData[0] << 8 | gyroData[1] );
 	rawGyroY = (int16_t) ( gyroData[2] << 8 | gyroData[3] );
 	rawGyroZ = (int16_t) ( gyroData[4] << 8 | gyroData[5] );
-	data->gyroX = rawGyroX / 16384.0;
-	data->gyroY = rawGyroY / 16384.0;
-	data->gyroZ = rawGyroZ / 16384.0;
+	float gyroX = rawGyroX / 16384.0;
+	float gyroY = rawGyroY / 16384.0;
+	float gyroZ = rawGyroZ / 16384.0;
+
+
+	//Float FIR Filter
+	float firStateF32[COEFF_SIZE + SAMPLE_SIZE - 1];
+	float firCoeffF32[COEFF_SIZE] = { 0.020597, 0.065502, 0.166712, 0.248104,
+									  0.248104, 0.166712, 0.065502, 0.020597 };
+
+	arm_fir_instance_f32 armFIRInstanceF32;
+	arm_fir_init_f32( &armFIRInstanceF32, COEFF_SIZE, firCoeffF32, firStateF32, SAMPLE_SIZE );
+
+	FIRFilterData( &armFIRInstanceF32, &accelX[0] );
+	FIRFilterData( &armFIRInstanceF32, &accelY[0] );
+	FIRFilterData( &armFIRInstanceF32, &accelZ[0] );
+
+	// preciso de outro filtro para o giroscópio ou eu uso o mesmo?
+	//data->accelX = accelX;
+	//data->accelY = accelY;
+	//data->accelZ = accelZ;
+
+	data->gyroX = gyroX;
+	data->gyroY = gyroY;
+	data->gyroZ = gyroZ;
 }
 
 
-void FilterImuData( void )
+void FIRFilterData( arm_fir_instance_f32 * filter, float * data )
 {
-	//Float IIR Filter
-	float irrStateF32[8];
-	float iirCoeffF32[10] = { 0.077f, 0.154f, 0.077f, 1.049f, -0.296f,
-							  0.063f, 0.125f, 0.063f, 1.321f, -0.633f };
-	arm_biquad_casd_df1_inst_f32 armIIRInstanceF32;
-	arm_biquad_cascade_df1_init_f32(&armIIRInstanceF32, 2, iirCoeffF32, irrStateF32);
+	float filteredSample[SAMPLE_SIZE];
+	arm_fir_f32( filter, data, &filteredSample[0], SAMPLE_SIZE );
+	memcpy( data, filteredSample, SAMPLE_SIZE );
 }
 
 

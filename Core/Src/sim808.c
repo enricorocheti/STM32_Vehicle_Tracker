@@ -30,8 +30,6 @@ int SendCommandSimRadio( char *command, char *response )
 	uint8_t amble = 0;
 	uint16_t error = 0;
 
-	uint16_t teste = strlen(command);
-
 	HAL_UART_Transmit( &huart1, (uint8_t *)command, strlen(command), 100 );
 
 	while ( 1 )

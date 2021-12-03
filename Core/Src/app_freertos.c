@@ -229,48 +229,43 @@ void FuncLowPwrMode(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	uint32_t flags = osThreadFlagsGet();
-	if ( flags != 0x00 )
-	{
-		if ( flags == 0x01 )
-		{
-			/* Turn off low-power mode */
-			osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
-			int ret = InitSimRadio();
-			osMutexRelease( MutexSerialComSIM808Handle );
-			InitImu();
+	  /* Blink LEDs to show that the system is on low-power mode */
+	  if ( uiGVLowPowerFlag == 0x02 )
+	  {
+		  HAL_GPIO_TogglePin(LD_GPS_GPIO_Port, LD_GPS_Pin);
+		  HAL_GPIO_TogglePin(LD_SIM_GPIO_Port, LD_SIM_Pin);
+	  }
 
-			uiGVLowPowerFlag = 0x01;
+	  // Wait forever until either thread flag 0 or 1 is set.
+	  osThreadFlagsWait( 0x00000003, osFlagsWaitAny | osFlagsNoClear, 500 );
+	  uint32_t flags = osThreadFlagsGet();
+	  if ( flags == 0x00000001 )
+	  {
+		  /* Turn off low-power mode */
+		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
+		  InitSimRadio();
+		  osMutexRelease( MutexSerialComSIM808Handle );
+		  InitImu();
 
-			/* Turn off system LEDs */
-			HAL_GPIO_WritePin(LD_SIM_GPIO_Port, LD_SIM_Pin, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_RESET);
+		  uiGVLowPowerFlag = 0x01;
 
-		}
-		else if ( flags == 0x02 )
-		{
-			/* Turn on low-power mode */
-			osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
-			LowPowerModeSimRadio();
-			osMutexRelease( MutexSerialComSIM808Handle );
-			LowPowerModeImu();
+		  /* Turn off system LEDs */
+		  HAL_GPIO_WritePin(LD_SIM_GPIO_Port, LD_SIM_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_RESET);
+	  }
+	  else if ( flags == 0x00000002 )
+	  {
+		  /* Turn on low-power mode */
+		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
+		  LowPowerModeSimRadio();
+		  osMutexRelease( MutexSerialComSIM808Handle );
+		  LowPowerModeImu();
 
-			uiGVLowPowerFlag = 0x02;
-		}
-		flags = osThreadFlagsClear( flags );
-	}
-	else
-	{
-		/* Should not change system operation mode */
-		if ( uiGVLowPowerFlag == 0x02 )
-		{
-			/* Blink LEDs to show that the system is on low-power mode */
-			HAL_GPIO_TogglePin(LD_GPS_GPIO_Port, LD_GPS_Pin);
-			HAL_GPIO_TogglePin(LD_SIM_GPIO_Port, LD_SIM_Pin);
-		}
-	    osDelay(1000);
-	}
-	osDelay(10);
+		  uiGVLowPowerFlag = 0x02;
+	  }
+	  flags = osThreadFlagsClear( flags );
+
+	  osDelay(10);
   }
   /* USER CODE END FuncLowPwrMode */
 }
@@ -328,40 +323,36 @@ void FuncSensorData(void *argument)
   {
 	  if ( uiGVLowPowerFlag == 0x01 )
 	  {
-		  /* Low-power mode is OFF */
-		  uint32_t flags = osThreadFlagsGet();
-		  if ( flags == 0x00000001 )
+		  /* 10 seconds timer will set this flag */
+		  osThreadFlagsWait( 0x00000001, osFlagsWaitAny, osWaitForever );
+
+		  /* Changing xGVDataPacket variable */
+		  osMutexAcquire( MutexDataPacketHandle, osWaitForever );
+
+		  memset( &xGVDataPacket, 0, sizeof(xGVDataPacket) );
+
+		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
+		  GetGpsData( &xGVDataPacket );
+		  osMutexRelease( MutexSerialComSIM808Handle );
+
+		  if ( xGVDataPacket.gpsStatus == 'A' )
 		  {
-			  /* 10 seconds timer has been triggered */
-
-			  /* Changing xGVDataPacket variable */
-			  osMutexAcquire( MutexDataPacketHandle, osWaitForever );
-			  memset( &xGVDataPacket, 0, sizeof(xGVDataPacket) );
-
-			  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
-			  GetGpsData( &xGVDataPacket );
-			  osMutexRelease( MutexSerialComSIM808Handle );
-			  if ( xGVDataPacket.gpsStatus == 'A' )
-			  {
-				  /* GPS data is not valid */
-				  HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_RESET);
-			  }
-			  else
-			  {
-				  /* GPS data is valid */
-				  HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_SET);
-			  }
-
-			  GetImuData( &xGVDataPacket );
-
-			  /* Done with the xGVDataPacket variable */
-			  osMutexRelease( MutexDataPacketHandle );
-
-			  /* Tells TaskNwSendData that there is new data to be sent */
-			  osThreadFlagsSet( TaskNwSendDataHandle, 0x00000001 );
-
-			  flags = osThreadFlagsClear( flags );
+			  /* GPS data is not valid */
+			  HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_RESET);
 		  }
+		  else
+		  {
+			  /* GPS data is valid */
+			  HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_SET);
+		  }
+
+		  GetImuData( &xGVDataPacket );
+
+		  /* Done with the xGVDataPacket variable */
+		  osMutexRelease( MutexDataPacketHandle );
+
+		  /* Tells TaskNwSendData that there is new data to be sent */
+		  osThreadFlagsSet( TaskNwSendDataHandle, 0x00000001 );
 	  }
 	  osDelay(10);
   }
@@ -383,14 +374,9 @@ void FuncNwSendData(void *argument)
   {
 	  if ( uiGVLowPowerFlag == 0x01 )
 	  {
-		  uint32_t flags = osThreadFlagsGet();
-		  if ( flags == 0x00000001 )
-		  {
-			  //osMutexAcquire( MutexDataPacketHandle, osWaitForever );
-			  //osMutexRelease( MutexDataPacketHandle );
-			  //flags = osThreadFlagsClear( flags );
-		  }
-
+		  osThreadFlagsWait( 0x00000001, osFlagsWaitAny, osWaitForever );
+		  //osMutexAcquire( MutexDataPacketHandle, osWaitForever );
+		  //osMutexRelease( MutexDataPacketHandle );
 	  }
 	  osDelay(10);
   }
@@ -401,16 +387,13 @@ void FuncNwSendData(void *argument)
 void CallbackTimer(void *argument)
 {
   /* USER CODE BEGIN CallbackTimer */
-	uint32_t ret = osThreadFlagsSet( TaskSensorDataHandle, 0x00000001 );
-	if ( (ret >> 7) & 1 )
-	{
+
+	osThreadFlagsSet( TaskSensorDataHandle, 0x00000001 );
+	//if ( (ret >> 7) & 1 )
+	//{
 		/* If bit 8 is set, there's an error on osThreadFlagsSet execution */
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-	}
-	else
-	{
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-	}
+	//}
+
   /* USER CODE END CallbackTimer */
 }
 

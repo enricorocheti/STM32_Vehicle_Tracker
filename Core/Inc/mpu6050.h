@@ -5,16 +5,19 @@
 extern "C" {
 #endif
 
-
-//#include <stdio.h>
-//#include <string.h>
 #include "i2c.h"
 #include "global.h"
-//#include "usart.h"
 
+/* FIR filter defines */
+#define ARM_MATH_CM4
+#include <arm_math.h>
 
+#define SAMPLE_SIZE		100
+#define COEFF_SIZE		8
+#define GRAVITY_ACC		9.81
+
+/* I2C defines */
 #define MPU6050_ADDR 		0xD0
-
 #define REG_WHO_AM_I		0x75
 #define REG_PWR_MGMT_1 		0x6B
 #define REG_SMPLRT_DIV 		0x19
@@ -30,6 +33,6 @@ void GetImuData( struct sensorData * data );
 
 void LowPowerModeImu( void );
 
-void FilterImuData( void );
+void FIRFilterData( arm_fir_instance_f32 * filter, float * data );
 
 #endif
