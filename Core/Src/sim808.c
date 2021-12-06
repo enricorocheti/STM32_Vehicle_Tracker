@@ -1,6 +1,6 @@
 #include "sim808.h"
 #include "main.h"
-
+#include <stdlib.h>
 
 int SendCommandSimRadio_NEW( char *command, char *response, uint16_t size_cmd, uint16_t size_rsp )
 {
@@ -170,20 +170,23 @@ int GetGpsData( struct sensorData *data )
 	ret = SendCommandSimRadio( AT_GPS_GET_DATA, response );
 	char *ptr = strtok( &response[14], comma );
 
-	data->utcTime = *ptr;
+	data->utcTime = strtof(ptr, NULL);
 	ptr = strtok(NULL, comma);
-	data->gpsStatus = *ptr; 		// possui byte 0 no final, talvez seja preciso remover
+	data->gpsStatus = *ptr;
 	ptr = strtok(NULL, comma);
-	data->latitude = *ptr;
+	data->latitude = strtof(ptr, NULL);
 	ptr = strtok(NULL, comma);
 	data->nsIndicator = *ptr;
 	ptr = strtok(NULL, comma);
-	data->longitude = *ptr;
+	data->longitude = strtof(ptr, NULL);
 	ptr = strtok(NULL, comma);
 	data->ewIndicator = *ptr;
 	ptr = strtok(NULL, comma);
-	data->speedKnots = *ptr;
+	data->speedKnots = strtof(ptr, NULL);
 	ptr = strtok(NULL, comma);
+	/* Cut off the COG field from NMEA because it's unnecessary */
+	ptr = strtok(NULL, comma);
+	data->date = strtod(ptr, NULL);
 
 	return ret;
 }

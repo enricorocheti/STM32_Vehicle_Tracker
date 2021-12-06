@@ -74,28 +74,28 @@ osThreadId_t TaskLowPwrModeHandle;
 const osThreadAttr_t TaskLowPwrMode_attributes = {
   .name = "TaskLowPwrMode",
   .priority = (osPriority_t) osPriorityHigh,
-  .stack_size = 12000 * 4
+  .stack_size = 2048 * 4
 };
 /* Definitions for TaskNwConnect */
 osThreadId_t TaskNwConnectHandle;
 const osThreadAttr_t TaskNwConnect_attributes = {
   .name = "TaskNwConnect",
   .priority = (osPriority_t) osPriorityNormal2,
-  .stack_size = 1024 * 4
+  .stack_size = 2048 * 4
 };
 /* Definitions for TaskSensorData */
 osThreadId_t TaskSensorDataHandle;
 const osThreadAttr_t TaskSensorData_attributes = {
   .name = "TaskSensorData",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 1024 * 4
+  .stack_size = 4096 * 4
 };
 /* Definitions for TaskNwSendData */
 osThreadId_t TaskNwSendDataHandle;
 const osThreadAttr_t TaskNwSendData_attributes = {
   .name = "TaskNwSendData",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 1024 * 4
+  .stack_size = 4096 * 4
 };
 /* Definitions for SensorDataTimer */
 osTimerId_t SensorDataTimerHandle;
@@ -236,7 +236,7 @@ void FuncLowPwrMode(void *argument)
 		  HAL_GPIO_TogglePin(LD_SIM_GPIO_Port, LD_SIM_Pin);
 	  }
 
-	  // Wait forever until either thread flag 0 or 1 is set.
+	  /* Wait until either thread flag 0 or 1 is set (500ms timeout) */
 	  osThreadFlagsWait( 0x00000003, osFlagsWaitAny | osFlagsNoClear, 500 );
 	  uint32_t flags = osThreadFlagsGet();
 	  if ( flags == 0x00000001 )
@@ -335,7 +335,7 @@ void FuncSensorData(void *argument)
 		  GetGpsData( &xGVDataPacket );
 		  osMutexRelease( MutexSerialComSIM808Handle );
 
-		  if ( xGVDataPacket.gpsStatus == 'A' )
+		  if ( xGVDataPacket.gpsStatus == 'V' )
 		  {
 			  /* GPS data is not valid */
 			  HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_RESET);

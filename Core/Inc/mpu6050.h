@@ -35,4 +35,6 @@ void LowPowerModeImu( void );
 
 void FIRFilterData( arm_fir_instance_f32 * filter, float * data );
 
+float CalculateAverage( float * data );
+
 #endif

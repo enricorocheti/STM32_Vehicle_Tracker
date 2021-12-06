@@ -42,17 +42,19 @@ void GetImuData( struct sensorData * data )
 {
 	uint8_t accelData[6];
 	uint8_t gyroData[6];
-
 	int16_t rawAccelX = 0, rawAccelY = 0, rawAccelZ = 0;
 	int16_t rawGyroX = 0, rawGyroY = 0, rawGyroZ = 0;
+	float accelX[SAMPLE_SIZE], accelY[SAMPLE_SIZE], accelZ[SAMPLE_SIZE];
+	float gyroX[SAMPLE_SIZE], gyroY[SAMPLE_SIZE], gyroZ[SAMPLE_SIZE];
 
-	float accelX[100];
-	float accelY[100];
-	float accelZ[100];
+	/*** convert the RAW values into acceleration in 'g'
+	     we have to divide according to the Full scale value set in FS_SEL
+	     I have configured FS_SEL = 0. So I am dividing by 16384.0
+	     for more details check ACCEL_CONFIG Register              ****/
 
-	for ( uint8_t i = 0; i < 100; i++ )
+	for ( uint8_t i = 0; i < SAMPLE_SIZE; i++ )
 	{
-		// Read 6 BYTES of data starting from ACCEL_XOUT_H register
+		/* Read 6 BYTES of data starting from ACCEL_XOUT_H register */
 		HAL_I2C_Mem_Read( &hi2c1, MPU6050_ADDR, REG_ACCEL_XOUT_H, 1, accelData, 6, 500 );
 		rawAccelX = (int16_t) ( accelData[0] << 8 | accelData[1] );
 		rawAccelY = (int16_t) ( accelData[2] << 8 | accelData[3] );
@@ -63,42 +65,46 @@ void GetImuData( struct sensorData * data )
 		accelZ[i] = rawAccelZ * GRAVITY_ACC / 16384.0;
 	}
 
-	// Read 6 BYTES of data starting from GYRO_XOUT_H register
-	HAL_I2C_Mem_Read( &hi2c1, MPU6050_ADDR, REG_GYRO_XOUT_H, 1, gyroData, 6, 500 );
+	for ( uint8_t i = 0; i < SAMPLE_SIZE; i++ )
+	{
+		/* Read 6 BYTES of data starting from GYRO_XOUT_H register */
+		HAL_I2C_Mem_Read( &hi2c1, MPU6050_ADDR, REG_GYRO_XOUT_H, 1, gyroData, 6, 500 );
+		rawGyroX = (int16_t) ( gyroData[0] << 8 | gyroData[1] );
+		rawGyroY = (int16_t) ( gyroData[2] << 8 | gyroData[3] );
+		rawGyroZ = (int16_t) ( gyroData[4] << 8 | gyroData[5] );
 
-	/*** convert the RAW values into acceleration in 'g'
-	     we have to divide according to the Full scale value set in FS_SEL
-	     I have configured FS_SEL = 0. So I am dividing by 16384.0
-	     for more details check ACCEL_CONFIG Register              ****/
+		gyroX[i] = rawGyroX / 16384.0;
+		gyroY[i] = rawGyroY / 16384.0;
+		gyroZ[i] = rawGyroZ / 16384.0;
+	}
 
-	rawGyroX = (int16_t) ( gyroData[0] << 8 | gyroData[1] );
-	rawGyroY = (int16_t) ( gyroData[2] << 8 | gyroData[3] );
-	rawGyroZ = (int16_t) ( gyroData[4] << 8 | gyroData[5] );
-	float gyroX = rawGyroX / 16384.0;
-	float gyroY = rawGyroY / 16384.0;
-	float gyroZ = rawGyroZ / 16384.0;
+	data->accelX = CalculateAverage( accelX );
+	data->accelY = CalculateAverage( accelY );
+	data->accelZ = CalculateAverage( accelZ );
+	data->gyroX = CalculateAverage( gyroX );
+	data->gyroY = CalculateAverage( gyroY );
+	data->gyroZ = CalculateAverage( gyroZ );
 
-
-	//Float FIR Filter
+	/* Float FIR Filter, low-pass 10Hz cutoff */
 	float firStateF32[COEFF_SIZE + SAMPLE_SIZE - 1];
-	float firCoeffF32[COEFF_SIZE] = { 0.020597, 0.065502, 0.166712, 0.248104,
-									  0.248104, 0.166712, 0.065502, 0.020597 };
-
+	float firCoeffF32[COEFF_SIZE] = { 	0.020623, 0.065507, 0.166590, 0.247822,
+										0.247822, 0.166590, 0.065507, 0.020623 };
 	arm_fir_instance_f32 armFIRInstanceF32;
 	arm_fir_init_f32( &armFIRInstanceF32, COEFF_SIZE, firCoeffF32, firStateF32, SAMPLE_SIZE );
 
 	FIRFilterData( &armFIRInstanceF32, &accelX[0] );
 	FIRFilterData( &armFIRInstanceF32, &accelY[0] );
 	FIRFilterData( &armFIRInstanceF32, &accelZ[0] );
+	data->accelX = CalculateAverage( accelX );
+	data->accelY = CalculateAverage( accelY );
+	data->accelZ = CalculateAverage( accelZ );
 
-	// preciso de outro filtro para o giroscópio ou eu uso o mesmo?
-	//data->accelX = accelX;
-	//data->accelY = accelY;
-	//data->accelZ = accelZ;
-
-	data->gyroX = gyroX;
-	data->gyroY = gyroY;
-	data->gyroZ = gyroZ;
+	FIRFilterData( &armFIRInstanceF32, &gyroX[0] );
+	FIRFilterData( &armFIRInstanceF32, &gyroY[0] );
+	FIRFilterData( &armFIRInstanceF32, &gyroZ[0] );
+	data->gyroX = CalculateAverage( gyroX );
+	data->gyroY = CalculateAverage( gyroY );
+	data->gyroZ = CalculateAverage( gyroZ );
 }
 
 
@@ -107,6 +113,20 @@ void FIRFilterData( arm_fir_instance_f32 * filter, float * data )
 	float filteredSample[SAMPLE_SIZE];
 	arm_fir_f32( filter, data, &filteredSample[0], SAMPLE_SIZE );
 	memcpy( data, filteredSample, SAMPLE_SIZE );
+}
+
+float CalculateAverage( float * data )
+{
+	float average = 0.0;
+
+	// Discard first 10 data from filter oscilation
+	for ( uint8_t i = 10; i < SAMPLE_SIZE; i++ )
+	{
+		average += data[i];
+	}
+	average /= SAMPLE_SIZE - 10;
+
+	return average;
 }
 
 
