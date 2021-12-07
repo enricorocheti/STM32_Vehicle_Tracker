@@ -244,8 +244,8 @@ void FuncLowPwrMode(void *argument)
 		  /* Turn off low-power mode */
 		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
 		  InitSimRadio();
-		  osMutexRelease( MutexSerialComSIM808Handle );
 		  InitImu();
+		  osMutexRelease( MutexSerialComSIM808Handle );
 
 		  uiGVLowPowerFlag = 0x01;
 
@@ -258,8 +258,8 @@ void FuncLowPwrMode(void *argument)
 		  /* Turn on low-power mode */
 		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
 		  LowPowerModeSimRadio();
-		  osMutexRelease( MutexSerialComSIM808Handle );
 		  LowPowerModeImu();
+		  osMutexRelease( MutexSerialComSIM808Handle );
 
 		  uiGVLowPowerFlag = 0x02;
 	  }
@@ -287,18 +287,22 @@ void FuncNwConnect(void *argument)
 	  {
 		  if ( uiGVNetworkStatus == 0 )
 		  {
-			  int ret = 1;//JoinSimRadioNetwork();
-			  if ( ret == 1 )
+			  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
+			  int ret = JoinSimRadioNetwork();
+			  if ( ret == 0 )
 			  {
 				  /* Successfully joined network */
+				  osMutexAcquire( MutexNetworkStatusHandle, osWaitForever );
 				  uiGVNetworkStatus = 1;
 				  HAL_GPIO_WritePin( LD_SIM_GPIO_Port, LD_SIM_Pin, GPIO_PIN_SET );
+				  osMutexRelease( MutexNetworkStatusHandle );
 			  }
 			  else
 			  {
 				  /* Couldn't join network */
 				  HAL_GPIO_WritePin( LD_SIM_GPIO_Port, LD_SIM_Pin, GPIO_PIN_RESET );
 			  }
+			  osMutexRelease( MutexSerialComSIM808Handle );
 		  }
 		  osDelay(10000);
 	  }
@@ -374,9 +378,24 @@ void FuncNwSendData(void *argument)
   {
 	  if ( uiGVLowPowerFlag == 0x01 )
 	  {
-		  osThreadFlagsWait( 0x00000001, osFlagsWaitAny, osWaitForever );
-		  //osMutexAcquire( MutexDataPacketHandle, osWaitForever );
-		  //osMutexRelease( MutexDataPacketHandle );
+		  if ( uiGVNetworkStatus == 1 )
+		  {
+			  osThreadFlagsWait( 0x00000001, osFlagsWaitAny, osWaitForever );
+			  osMutexAcquire( MutexDataPacketHandle, osWaitForever );
+			  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
+
+			  int ret = SendNetworkData( &xGVDataPacket );
+			  if ( ret == -1 )
+			  {
+				  /* No connection*/
+				  osMutexAcquire( MutexNetworkStatusHandle, osWaitForever );
+				  uiGVNetworkStatus = 0;
+				  osMutexRelease( MutexNetworkStatusHandle );
+			  }
+
+			  osMutexRelease( MutexSerialComSIM808Handle );
+			  osMutexRelease( MutexDataPacketHandle );
+		  }
 	  }
 	  osDelay(10);
   }

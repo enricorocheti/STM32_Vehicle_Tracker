@@ -1,6 +1,7 @@
 #include "sim808.h"
 #include "main.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 int SendCommandSimRadio_NEW( char *command, char *response, uint16_t size_cmd, uint16_t size_rsp )
 {
@@ -142,19 +143,57 @@ int InitSimRadio( void )
 
 int JoinSimRadioNetwork( void )
 {
+	int ret = 0;
 	char response[25] = "\0";
 
 	SendCommandSimRadio( AT_NW_SET_APNCLARO, response );
 	if ( strcmp(response, "\r\nOK\r\n") )
 	{
-		return -1;
+		ret |= 0b1;
 	}
 
-	memset(response, 0, 25);
+	memset( response, 0, 25 );
 	SendCommandSimRadio( AT_NW_SET_CONNECTION, response );
 	if ( strcmp(response, "\r\nOK\r\n") )
 	{
-		return -1;
+		ret |= 0b10;
+	}
+
+	return ret;
+}
+
+
+int SendNetworkData( struct sensorData *data )
+{
+	char response[64] = "\0";
+	char dataCommand[256] = "\0";
+	int dataLength;
+
+	SendCommandSimRadio( AT_TCP_START, response );
+	if ( strcmp(response, "\r\nOK\r\nCONNECT OK\r\n") )
+	{
+		return -2;
+	}
+
+	sprintf( dataCommand,
+			 "GET /update?api_key=T8D5CZES6W7RV89G"
+			 "&field1=%f&field2=%f&field3=%f&field4=%f"
+			 "&field5=%f&field6=%f&field7=%f&field8=%f",
+			 data->latitude, data->longitude, data->accelX, data->accelY,
+			 data->accelZ, data->gyroX, data->gyroY, data->gyroZ );
+	dataLength = strlen( dataCommand );
+
+	/* Post amble eh diferente, recebe apenas 0D 0A 3E 20 */
+	SendCommandSimRadio( AT_TCP_SEND_BYTES(dataLength), response );
+	if ( ! strcmp(response, "\r\n> ") )
+	{
+		memset( response, 0, 64 );
+		SendCommandSimRadio( AT_TCP_SEND_BYTES(dataLength), response );
+		if( strstr(response, "CME ERROR") != NULL || strstr(response, "SEND FAIL") != NULL )
+		{
+		    /* Datasheet p224: * If connection is not established or module is disconnected */
+			return -1;
+		}
 	}
 
 	return 1;
@@ -194,22 +233,23 @@ int GetGpsData( struct sensorData *data )
 
 int LowPowerModeSimRadio( void )
 {
+	int ret = 0;
 	char response[25] = "\0";
 
 	SendCommandSimRadio( AT_SIM_SET_MINFUNC, response );
 	if ( strcmp(response, "\r\nOK\r\n") )
 	{
-		return -1;
+		ret |= 0b1;
 	}
 
 	memset(response, 0, 25);
 	SendCommandSimRadio( AT_GPS_SET_PWROFF, response );
 	if ( strcmp(response, "\r\nOK\r\n") )
 	{
-		return -1;
+		ret |= 0b10;
 	}
 
-	return 1;
+	return ret;
 }
 
 int PowerOnSimRadio( void )
