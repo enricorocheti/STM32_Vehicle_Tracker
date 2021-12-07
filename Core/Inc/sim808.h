@@ -43,7 +43,7 @@ extern "C" {
 #define AT_NW_SET_APNCLARO		"AT+CSTT=\"datelo.com.br\",\"claro\",\"claro\"\r\n"
 
 
-int SendCommandSimRadio( char *command, char *response );
+int SendCommandSimRadio( const char *command, char *response );
 
 int InitSimRadio( void );
 

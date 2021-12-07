@@ -1,5 +1,6 @@
 #include "sim808.h"
 #include "main.h"
+#include "cmsis_os.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -23,7 +24,7 @@ int SendCommandSimRadio_NEW( char *command, char *response, uint16_t size_cmd, u
 
 
 
-int SendCommandSimRadio( char *command, char *response )
+int SendCommandSimRadio( const char *command, char *response )
 {
 	uint8_t temp_byte = 0;
 	uint8_t prev_byte = 0;
@@ -261,7 +262,7 @@ int PowerOnSimRadio( void )
 	HAL_GPIO_WritePin( POWER_SIM_GPIO_Port, POWER_SIM_Pin, GPIO_PIN_SET);
 	osDelay(1000);
 	HAL_GPIO_WritePin( POWER_SIM_GPIO_Port, POWER_SIM_Pin, GPIO_PIN_RESET);
-	osDelay(100);
+	osDelay(1000);
 
 	/* Disable command echo */
 	memset(cmd_resp, 0, 25);
