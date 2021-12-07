@@ -4,24 +4,54 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int SendCommandSimRadio_NEW( char *command, char *response, uint16_t size_cmd, uint16_t size_rsp )
+uint8_t uart1_rx_buffer[512] = { '\0' };
+uint8_t uart1_rx_byte = '\0';
+int16_t uart1_rx_index = 0;
+
+void HAL_UART_RxCpltCallback( UART_HandleTypeDef *huart )
 {
-	int ret;
-
-	HAL_UART_Transmit_IT( &huart1, (uint8_t *)command, size_cmd );
-
-	if ( HAL_UART_Receive_IT( &huart1, (uint8_t *) response, size_rsp ) == HAL_OK )
+	if (huart->Instance == USART1)
 	{
-		ret = 1;
+		if (uart1_rx_index > (512 - 1))
+		{
+			uart1_rx_index = 0;
+		}
+		uart1_rx_buffer[uart1_rx_index++] = uart1_rx_byte;
+		HAL_UART_Receive_IT( &huart1, &uart1_rx_byte, 1 );
 	}
-	else
-	{
-		ret = -1;
-	}
-
-	return ret;
 }
 
+void ClearRxBuffer( void )
+{
+	uart1_rx_index = 0;
+	memset(uart1_rx_buffer, 0, sizeof(uart1_rx_buffer));
+}
+
+int8_t SendAtCommand( const char *cmd, const char *ack, int16_t timeout )
+{
+
+	uart1_rx_index = 0;
+	uart1_rx_buffer[0] = '\0';
+	int8_t ret = 1;
+
+	HAL_UART_Receive_IT( &huart1, &uart1_rx_byte, 1 );
+	if( HAL_OK != HAL_UART_Transmit( &huart1, (uint8_t *)cmd, strlen(cmd), 100 ) )
+	{
+		return ret;
+	}
+
+	while ( timeout > 0 && ret == 1 )
+	{
+		if ( strstr( (char *)uart1_rx_buffer, ack ) )
+		{
+			ret = 0;
+		}
+		osDelay(100);
+		timeout -= 100;
+	}
+	ClearRxBuffer();
+	return ret;
+}
 
 
 int SendCommandSimRadio( const char *command, char *response )
@@ -82,58 +112,50 @@ int SendCommandSimRadio( const char *command, char *response )
 
 int InitSimRadio( void )
 {
-	char cmd_resp[25];
 	int ret = 0;
 	int sim_ret;
 
 	/*** SIM initialization ***/
-	memset(cmd_resp, 0, 25);
-	sim_ret = SendCommandSimRadio( AT_SIM_SET_FULLFUNC, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || sim_ret != 1 )
+	sim_ret = SendAtCommand( AT_SIM_SET_FULLFUNC, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b1;
 	}
 
-	/*memset(cmd_resp, 0, 25);
-	sim_ret = SendCommandSimRadio( AT_SIM_GET_CPIN, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\n+CPIN: READY\r\n") || sim_ret != 1 )
+	/*sim_ret = SendAtCommand( AT_SIM_GET_CPIN, "READY", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b10;
 	}*/
 
 	/*** Network initialization ***/
-	memset(cmd_resp, 0, 25);
-	sim_ret = SendCommandSimRadio( AT_NW_SET_GPRS, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || sim_ret != 1 )
+	sim_ret = SendAtCommand( AT_NW_SET_GPRS, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b100;
 	}
 
-	memset(cmd_resp, 0, 25);
-	sim_ret = SendCommandSimRadio( AT_NW_SET_TCPMODE, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || sim_ret != 1 )
+	sim_ret = SendAtCommand( AT_NW_SET_TCPMODE, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b1000;
 	}
 
-	memset(cmd_resp, 0, 25);
-	sim_ret = SendCommandSimRadio( AT_NW_SET_SINGLEIP, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || sim_ret != 1 )
+	sim_ret = SendAtCommand( AT_NW_SET_SINGLEIP, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b10000;
 	}
 
 	/*** GPS initialization ***/
-	memset(cmd_resp, 0, 25);
-	sim_ret = SendCommandSimRadio( AT_GPS_SET_PWRON, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || sim_ret != 1 )
+	sim_ret = SendAtCommand( AT_GPS_SET_PWRON, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b100000;
 	}
 
-	memset(cmd_resp, 0, 25);
-	sim_ret = SendCommandSimRadio( AT_GPS_SET_HOTMODE, cmd_resp );
-	if ( strcmp(cmd_resp, "\r\nOK\r\n") || sim_ret != 1 )
+	sim_ret = SendAtCommand( AT_GPS_SET_HOTMODE, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b1000000;
 	}
@@ -145,17 +167,16 @@ int InitSimRadio( void )
 int JoinSimRadioNetwork( void )
 {
 	int ret = 0;
-	char response[25] = "\0";
+	int sim_ret = 0;
 
-	SendCommandSimRadio( AT_NW_SET_APNCLARO, response );
-	if ( strcmp(response, "\r\nOK\r\n") )
+	sim_ret = SendAtCommand( AT_NW_SET_APNCLARO, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b1;
 	}
 
-	memset( response, 0, 25 );
-	SendCommandSimRadio( AT_NW_SET_CONNECTION, response );
-	if ( strcmp(response, "\r\nOK\r\n") )
+	sim_ret = SendAtCommand( AT_NW_SET_CONNECTION, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b10;
 	}
@@ -166,12 +187,12 @@ int JoinSimRadioNetwork( void )
 
 int SendNetworkData( struct sensorData *data )
 {
-	char response[64] = "\0";
 	char dataCommand[256] = "\0";
 	int dataLength;
+	int sim_ret = 0;
 
-	SendCommandSimRadio( AT_TCP_START, response );
-	if ( strcmp(response, "\r\nOK\r\nCONNECT OK\r\n") )
+	sim_ret = SendAtCommand( AT_TCP_START, "CONNECT OK", 5000 );
+	if ( sim_ret == 1 )
 	{
 		return -2;
 	}
@@ -185,12 +206,11 @@ int SendNetworkData( struct sensorData *data )
 	dataLength = strlen( dataCommand );
 
 	/* Post amble eh diferente, recebe apenas 0D 0A 3E 20 */
-	SendCommandSimRadio( AT_TCP_SEND_BYTES(dataLength), response );
-	if ( ! strcmp(response, "\r\n> ") )
+	sim_ret = SendAtCommand( AT_TCP_SEND_BYTES(dataLength), ">", 5000 );
+	if ( sim_ret == 1 )
 	{
-		memset( response, 0, 64 );
-		SendCommandSimRadio( AT_TCP_SEND_BYTES(dataLength), response );
-		if( strstr(response, "CME ERROR") != NULL || strstr(response, "SEND FAIL") != NULL )
+		sim_ret = SendAtCommand( AT_TCP_SEND_BYTES(dataLength), "SEND OK", 5000 );
+		if ( sim_ret == 1 )
 		{
 		    /* Datasheet p224: * If connection is not established or module is disconnected */
 			return -1;
@@ -235,17 +255,16 @@ int GetGpsData( struct sensorData *data )
 int LowPowerModeSimRadio( void )
 {
 	int ret = 0;
-	char response[25] = "\0";
+	int sim_ret = 0;
 
-	SendCommandSimRadio( AT_SIM_SET_MINFUNC, response );
-	if ( strcmp(response, "\r\nOK\r\n") )
+	sim_ret = SendAtCommand( AT_SIM_SET_MINFUNC, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b1;
 	}
 
-	memset(response, 0, 25);
-	SendCommandSimRadio( AT_GPS_SET_PWROFF, response );
-	if ( strcmp(response, "\r\nOK\r\n") )
+	sim_ret = SendAtCommand( AT_GPS_SET_PWROFF, "OK", 1000 );
+	if ( sim_ret == 1 )
 	{
 		ret |= 0b10;
 	}
@@ -255,7 +274,6 @@ int LowPowerModeSimRadio( void )
 
 int PowerOnSimRadio( void )
 {
-	char cmd_resp[25];
 	int ret;
 
 	/* Set SIM808 EVB-V3.2 D9 pin high for one second to turn on the radio */
@@ -265,12 +283,7 @@ int PowerOnSimRadio( void )
 	osDelay(1000);
 
 	/* Disable command echo */
-	memset(cmd_resp, 0, 25);
-	ret = SendCommandSimRadio( AT_SIM_SET_ECHOOFF, cmd_resp );
-	if ( strcmp(cmd_resp, "ATE0\r\r\nOK\r\n") || ret != 1 )
-	{
-		return -1;
-	}
+	ret = SendAtCommand( AT_SIM_SET_ECHOOFF, "OK", 1000 );
 
-	return 1;
+	return ret;
 }

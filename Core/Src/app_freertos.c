@@ -257,7 +257,7 @@ void FuncLowPwrMode(void *argument)
 	  {
 		  /* Turn on low-power mode */
 		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
-		  LowPowerModeSimRadio();
+		  //LowPowerModeSimRadio();
 		  LowPowerModeImu();
 		  osMutexRelease( MutexSerialComSIM808Handle );
 
@@ -436,6 +436,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 }
 
+void LowPowerModeMcu( int state )
+{
+	if ( state == 1 )
+	{
+		HAL_SuspendTick();
+		HAL_PWR_EnableSleepOnExit();
+		HAL_PWR_EnterSLEEPMode( PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI );
+	}
+	else
+	{
+		HAL_PWR_DisableSleepOnExit();
+	}
+}
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

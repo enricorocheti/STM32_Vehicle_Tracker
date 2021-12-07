@@ -34,14 +34,13 @@ extern "C" {
 #define AT_NW_GET_LOCALIP		"AT+CIFSR\r\n"		// Get Local IP Address
 #define AT_NW_GET_RSSI			"AT+CSQ\r\n"		// Get signal strength in dBm
 
-#define AT_TCP_START			"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80"
-#define AT_TCP_SEND_BYTES(arg)  "AT+CIPSEND="#arg
+#define AT_TCP_START			"AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n"
+#define AT_TCP_SEND_BYTES(arg)  "AT+CIPSEND="#arg"\r\n"
 
 // Network APNs
 #define AT_NW_SET_APNVIVO		"AT+CSTT=\"zap.vivo.com.br\",\"vivo\",\"vivo\"\r\n"
 #define AT_NW_SET_APNTIM		"AT+CSTT=\"timbrasil.br\",\"tim\",\"tim\"\r\n"
 #define AT_NW_SET_APNCLARO		"AT+CSTT=\"datelo.com.br\",\"claro\",\"claro\"\r\n"
-
 
 int SendCommandSimRadio( const char *command, char *response );
 
