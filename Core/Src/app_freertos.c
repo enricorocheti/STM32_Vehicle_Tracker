@@ -55,9 +55,12 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 
-// 1 = MODO LP OFF
-// 2 = MODO LP ON
-uint8_t uiGVLowPowerFlag = 0x02;
+/* Global variables */
+/*
+ * uiGVLowPowerFlag = 1 -> Low-power OFF
+ * uiGVLowPowerFlag = 2 -> Low-power ON
+ */
+uint8_t uiGVLowPowerFlag = 2;
 uint8_t uiGVNetworkStatus = 0;
 struct sensorData xGVDataPacket;
 
@@ -120,6 +123,14 @@ const osMutexAttr_t MutexNetworkStatus_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
+
+/*
+ * Method name: 		LowPowerModeMcu
+ * Method description: 	Set MCU to sleep mode
+ * Input params: 		n/a
+ * Output params: 		n/a
+*/
+void LowPowerModeMcu( void );
 
 /* USER CODE END FunctionPrototypes */
 
@@ -225,12 +236,12 @@ void StartDefaultTask(void *argument)
 void FuncLowPwrMode(void *argument)
 {
   /* USER CODE BEGIN FuncLowPwrMode */
-	PowerOnSimRadio();
+  PowerOnSimRadio();
   /* Infinite loop */
   for(;;)
   {
 	  /* Blink LEDs to show that the system is on low-power mode */
-	  if ( uiGVLowPowerFlag == 0x02 )
+	  if ( uiGVLowPowerFlag == 2 )
 	  {
 		  HAL_GPIO_TogglePin(LD_GPS_GPIO_Port, LD_GPS_Pin);
 		  HAL_GPIO_TogglePin(LD_SIM_GPIO_Port, LD_SIM_Pin);
@@ -238,32 +249,29 @@ void FuncLowPwrMode(void *argument)
 
 	  /* Wait until either thread flag 0 or 1 is set (500ms timeout) */
 	  osThreadFlagsWait( 0x00000003, osFlagsWaitAny | osFlagsNoClear, 500 );
-	  uint32_t flags = osThreadFlagsGet();
-	  if ( flags == 0x00000001 )
+	  uint32_t uiFlags = osThreadFlagsGet();
+	  if ( uiFlags == 0x00000001 )
 	  {
-		  /* Turn off low-power mode */
+		  /* Turn OFF low-power mode */
 		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
 		  InitSimRadio();
 		  InitImu();
 		  osMutexRelease( MutexSerialComSIM808Handle );
 
-		  uiGVLowPowerFlag = 0x01;
-
-		  /* Turn off system LEDs */
-		  HAL_GPIO_WritePin(LD_SIM_GPIO_Port, LD_SIM_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_RESET);
+		  uiGVLowPowerFlag = 1;
 	  }
-	  else if ( flags == 0x00000002 )
+	  else if ( uiFlags == 0x00000002 )
 	  {
-		  /* Turn on low-power mode */
+		  /* Turn ON low-power mode */
 		  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
-		  //LowPowerModeSimRadio();
+		  LowPowerModeSimRadio();
 		  LowPowerModeImu();
+		  LowPowerModeMcu();
 		  osMutexRelease( MutexSerialComSIM808Handle );
 
-		  uiGVLowPowerFlag = 0x02;
+		  uiGVLowPowerFlag = 2;
 	  }
-	  flags = osThreadFlagsClear( flags );
+	  uiFlags = osThreadFlagsClear( uiFlags );
 
 	  osDelay(10);
   }
@@ -283,13 +291,13 @@ void FuncNwConnect(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  if ( uiGVLowPowerFlag == 0x01 )
+	  if ( uiGVLowPowerFlag == 1 )
 	  {
 		  if ( uiGVNetworkStatus == 0 )
 		  {
 			  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
-			  int ret = JoinSimRadioNetwork();
-			  if ( ret == 0 )
+			  int iRet = JoinSimRadioNetwork();
+			  if ( iRet == 0 )
 			  {
 				  /* Successfully joined network */
 				  osMutexAcquire( MutexNetworkStatusHandle, osWaitForever );
@@ -321,11 +329,11 @@ void FuncNwConnect(void *argument)
 void FuncSensorData(void *argument)
 {
   /* USER CODE BEGIN FuncSensorData */
-	osTimerStart( SensorDataTimerHandle, 10000U );
+  osTimerStart( SensorDataTimerHandle, 10000U );
   /* Infinite loop */
   for(;;)
   {
-	  if ( uiGVLowPowerFlag == 0x01 )
+	  if ( uiGVLowPowerFlag == 1 )
 	  {
 		  /* 10 seconds timer will set this flag */
 		  osThreadFlagsWait( 0x00000001, osFlagsWaitAny, osWaitForever );
@@ -376,7 +384,7 @@ void FuncNwSendData(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  if ( uiGVLowPowerFlag == 0x01 )
+	  if ( uiGVLowPowerFlag == 1 )
 	  {
 		  if ( uiGVNetworkStatus == 1 )
 		  {
@@ -384,8 +392,8 @@ void FuncNwSendData(void *argument)
 			  osMutexAcquire( MutexDataPacketHandle, osWaitForever );
 			  osMutexAcquire( MutexSerialComSIM808Handle, osWaitForever );
 
-			  int ret = SendNetworkData( &xGVDataPacket );
-			  if ( ret == -1 )
+			  int iRet = SendNetworkData( &xGVDataPacket );
+			  if ( iRet == -2 )
 			  {
 				  /* No connection*/
 				  osMutexAcquire( MutexNetworkStatusHandle, osWaitForever );
@@ -406,13 +414,7 @@ void FuncNwSendData(void *argument)
 void CallbackTimer(void *argument)
 {
   /* USER CODE BEGIN CallbackTimer */
-
-	osThreadFlagsSet( TaskSensorDataHandle, 0x00000001 );
-	//if ( (ret >> 7) & 1 )
-	//{
-		/* If bit 8 is set, there's an error on osThreadFlagsSet execution */
-	//}
-
+  osThreadFlagsSet( TaskSensorDataHandle, 0x00000001 );
   /* USER CODE END CallbackTimer */
 }
 
@@ -422,32 +424,30 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if ( GPIO_Pin == B1_Pin )
 	{
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-		if ( uiGVLowPowerFlag == 0x01 )
+		/* Turn off system LEDs */
+		HAL_GPIO_WritePin(LD_SIM_GPIO_Port, LD_SIM_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(LD_GPS_GPIO_Port, LD_GPS_Pin, GPIO_PIN_RESET);
+
+		if ( uiGVLowPowerFlag == 1 )
 		{
-			/* Ativa modo low-power */
+			/* Low-power ON */
 			osThreadFlagsSet( TaskLowPwrModeHandle, 0x00000002 );
 		}
-		else if ( uiGVLowPowerFlag == 0x02 )
+		else if ( uiGVLowPowerFlag == 2 )
 		{
-			/* Desativa modo low-power */
+			/* Low-power OFF */
 			osThreadFlagsSet( TaskLowPwrModeHandle, 0x00000001 );
 		}
 	}
 }
 
-void LowPowerModeMcu( int state )
+void LowPowerModeMcu( void )
 {
-	if ( state == 1 )
-	{
-		HAL_SuspendTick();
-		HAL_PWR_EnableSleepOnExit();
-		HAL_PWR_EnterSLEEPMode( PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI );
-	}
-	else
-	{
-		HAL_PWR_DisableSleepOnExit();
-	}
+	/*
+	 * PWR_SLEEPENTRY_WFI (Wait For Interrupt)
+	 * When B1 is pressed, an EXTI wakes the device up
+	 */
+	HAL_PWR_EnterSLEEPMode( PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI );
 }
 /* USER CODE END Application */
 

@@ -1,3 +1,11 @@
+/*
+ * File name: 			sim808.h
+ * File description: 	Functions prototypes to handle the SIM808 radio
+ * Author name: 		Enrico Oliveira Rocheti
+ * Revision date: 		07/12/2021
+*/
+
+
 #ifndef __SIM808_H__
 #define __SIM808_H__
 
@@ -42,20 +50,98 @@ extern "C" {
 #define AT_NW_SET_APNTIM		"AT+CSTT=\"timbrasil.br\",\"tim\",\"tim\"\r\n"
 #define AT_NW_SET_APNCLARO		"AT+CSTT=\"datelo.com.br\",\"claro\",\"claro\"\r\n"
 
-int SendCommandSimRadio( const char *command, char *response );
 
+/*
+ * Method name: 		SendAtCommand
+ * Method description: 	Send AT command to radio and check if ack is in its response
+ * Input params: 		command: 		AT command to be sent
+ * 						ack: 			expected response
+ * 						timeout:		timeout in ms if the radio do not answer
+ * Output params: 		return 0:		ack was found on radio response
+ * 						other than 0: 	ERROR
+*/
+int SendAtCommand( const char *command, const char *ack, uint16_t timeout );
+
+
+/*
+ * Method name: 		ClearRxBuffer
+ * Method description: 	Clear global variable Rx Buffer
+ * Input params: 		n/a
+ * Output params: 		n/a
+*/
+void ClearRxBuffer( void );
+
+
+/*
+ * Method name: 		InitSimRadio
+ * Method description: 	Configure radio initializtion with AT commands
+ * Input params: 		n/a
+ * Output params: 		return 0:		OK
+ * 						other than 0: 	ERROR
+*/
 int InitSimRadio( void );
 
+
+/*
+ * Method name: 		JoinSimRadioNetwork
+ * Method description: 	Register on radio configured network
+ * Input params: 		n/a
+ * Output params: 		return 0:		OK
+ * 						other than 0: 	ERROR
+*/
 int JoinSimRadioNetwork( void );
 
+
+/*
+ * Method name: 		SendNetworkData
+ * Method description: 	Send data through radio network
+ * Input params: 		data:			struct containing data to be sent
+ * Output params: 		return 0:		OK
+ * 						return -1: 		TCP ERROR
+ * 						return -2:		Network ERROR
+*/
 int SendNetworkData( struct sensorData *data );
 
+
+/*
+ * Method name: 		ReadGpsData
+ * Method description: 	Read raw GPS data from radio
+ * Input params: 		command:		AT command to be sent
+ * 						response:		char pointer to write the radio response
+ * Output params: 		return 0: 		OK
+ * 						return 1: 		ERROR
+*/
+int ReadGpsData( const char *command, char *response );
+
+
+/*
+ * Method name: 		GetGpsData
+ * Method description: 	Get GPS data from radio
+ * Input params: 		data:			struct to receive the GPS's formatted data
+ * Output params: 		return 0: 		OK
+ * 						return 1: 		ERROR
+*/
 int GetGpsData( struct sensorData *data );
 
+
+/*
+ * Method name: 		LowPowerModeSimRadio
+ * Method description: 	Set radio to low-power mode
+ * Input params: 		n/a
+ * Output params: 		return 0:		OK
+ * 						other than 0: 	ERROR
+*/
 int LowPowerModeSimRadio( void );
 
+
+/*
+ * Method name: 		PowerOnSimRadio
+ * Method description: 	Turn radio on using D9 pin, disable AT command echo
+ * Input params: 		n/a
+ * Output params: 		return 0:		OK
+ * 						other than 0: 	ERROR
+*/
 int PowerOnSimRadio( void );
 
-int SendCommandSimRadio_NEW( char *command, char *response, uint16_t size_cmd, uint16_t size_rsp );
 
 #endif

@@ -1,3 +1,10 @@
+/*
+ * File name: 			mpu6050.h
+ * File description: 	Functions prototypes to handle the MPU-6050 IMU
+ * Author name: 		Enrico Oliveira Rocheti
+ * Revision date: 		07/12/2021
+*/
+
 #ifndef __MPU6050_H__
 #define __MPU6050_H__
 
@@ -27,14 +34,51 @@ extern "C" {
 #define REG_GYRO_XOUT_H 	0x43
 
 
+/*
+ * Method name: 		InitImu
+ * Method description: 	Config IMU registers using I2C
+ * Input params: 		n/a
+ * Output params: 		return 0:		OK
+ * 						return -1: 		ERROR
+*/
 int InitImu( void );
 
+
+/*
+ * Method name: 		GetImuData
+ * Method description: 	Get IMU data, passing it through a FIR filter
+ * Input params: 		data: struct to receive the IMU's data
+ * Output params: 		n/a
+*/
 void GetImuData( struct sensorData * data );
 
+
+/*
+ * Method name: 		LowPowerModeImu
+ * Method description: 	Set IMU to low-power mode
+ * Input params: 		n/a
+ * Output params: 		n/a
+*/
 void LowPowerModeImu( void );
 
+
+/*
+ * Method name: 		FIRFilterData
+ * Method description: 	Apply FIR filter to data
+ * Input params: 		filter: filter pre configured struct
+ * 						data:	data to be filterd
+ * Output params: 		n/a
+*/
 void FIRFilterData( arm_fir_instance_f32 * filter, float * data );
 
+
+/*
+ * Method name: 		CalculateAverage
+ * Method description: 	Calculate the average of a float vector
+ * Input params: 		data: float data
+ * Output params: 		single avarage data
+*/
 float CalculateAverage( float * data );
+
 
 #endif

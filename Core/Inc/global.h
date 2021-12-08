@@ -1,3 +1,10 @@
+/*
+ * File name: 			global.h
+ * File description: 	Contains definitions that's used by multiple system files
+ * Author name: 		Enrico Oliveira Rocheti
+ * Revision date: 		07/12/2021
+*/
+
 #ifndef __GLOBAL_H__
 #define __GLOBAL_H__
 
