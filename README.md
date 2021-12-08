@@ -12,10 +12,15 @@ System data is sent to the cloud using TCP connection and the HTTP protocol. The
 Below you can see some system diagrams created on the development process.
 
 ![Block diagram](https://i.imgur.com/YsqunT8.jpg)
+
 System block diagram (in Portuguese).
 
+
 ![Electric diagram](https://i.imgur.com/pMMgvs7.jpg)
+
 System electric diagram.
 
+
 ![RTOS diagram](https://i.imgur.com/LcaBK3j.jpg)
+
 System RTOS diagram (in Portuguese).
